@@ -258,7 +258,7 @@ func TestEig(t *testing.T) {
 				if vecNorm := vec.FrobeniusNorm(); absf(vecNorm-1) > 2*epsilon {
 					t.Fatalf("lambda %v |v| %f", lambda, vecNorm)
 				}
-				av := Gemm(a, vec)
+				av := gemm(a, vec)
 				lambdaVec := Zeros(vec.Shape()...).Set([]int{0, 0}, vec)
 				lambdaVec.Mul(lambda)
 				if err := equal2(av, lambdaVec.ToSlice2(), test.tol); err != nil {
@@ -340,7 +340,7 @@ func TestInverseIteration(t *testing.T) {
 					if vecNorm := vec.FrobeniusNorm(); absf(vecNorm-1) > epsilon {
 						t.Fatalf("%v %f", lambda, vecNorm)
 					}
-					av := Gemm(aj, vec)
+					av := gemm(aj, vec)
 					lambdaVec := Zeros(vec.Shape()...).Set([]int{0, 0}, vec)
 					lambdaVec.Mul(lambda)
 					if err := equal2(av, lambdaVec.ToSlice2(), test.tol); err != nil {
@@ -466,7 +466,7 @@ func TestBalance(t *testing.T) {
 			for j := range d.Shape()[0] {
 				dInv.SetAt([]int{j, j}, 1/d.At(j, j))
 			}
-			dbd := Gemm(d, b, dInv)
+			dbd := gemm(d, b, dInv)
 			if err := equal2(dbd, test.a.ToSlice2(), epsilon); err != nil {
 				t.Fatalf("%+v", err)
 			}
@@ -536,14 +536,14 @@ func TestHessenberg(t *testing.T) {
 			hessenberg(h, q, bufs)
 
 			// Check q @ h @ q.H == a.
-			a := Gemm(q, h, q.H())
+			a := gemm(q, h, q.H())
 			if err := equal2(a, test.a.ToSlice2(), 3*epsilon*test.a.FrobeniusNorm()); err != nil {
 				t.Fatalf("%+v", err)
 			}
 
 			// Check q @ q.H == I.
 			delta := 5 * epsilon * float32(test.a.Shape()[0])
-			qq := Gemm(q, q.H())
+			qq := gemm(q, q.H())
 			if err := equal2(qq, Zeros(1).Eye(qq.Shape()[0], 0).ToSlice2(), delta); err != nil {
 				t.Fatalf("%+v", err)
 			}
@@ -557,9 +557,9 @@ func TestHessenberg(t *testing.T) {
 
 			if len(test.h) > 0 {
 				// Match ground truth basis.
-				phase := Gemm(q.H(), T2(test.q))
-				q.Set([]int{0, 0}, Gemm(q, phase))
-				h.Set([]int{0, 0}, Gemm(phase.H(), h, phase))
+				phase := gemm(q.H(), T2(test.q))
+				q.Set([]int{0, 0}, gemm(q, phase))
+				h.Set([]int{0, 0}, gemm(phase.H(), h, phase))
 
 				// Check results.
 				if err := equal2(h, test.h, 2*epsilon*test.a.FrobeniusNorm()); err != nil {
@@ -807,7 +807,7 @@ func TestQRFat(t *testing.T) {
 			}
 
 			// Check q is unitary.
-			qqt := Gemm(q.H(), q)
+			qqt := gemm(q.H(), q)
 			identity := Zeros(1).Eye(qqt.Shape()[0], 0).ToSlice2()
 			if err := equal2(qqt, identity, 5*epsilon); err != nil {
 				t.Fatalf("%+v %#v", err, qqt.ToSlice2())
@@ -1018,7 +1018,7 @@ func TestSVD(t *testing.T) {
 
 			// Check a = u @ s @ v.H.
 			m := float32(a.Shape()[0])
-			usv := Gemm(u, s, v.H())
+			usv := gemm(u, s, v.H())
 			if err := equal2(usv, a.ToSlice2(), m*epsilon*a.FrobeniusNorm()); err != nil {
 				t.Fatalf("%+v", err)
 			}
@@ -1032,10 +1032,10 @@ func TestSVD(t *testing.T) {
 			}
 
 			// Check unitary.
-			if err := equal2(Gemm(u.H(), u), Zeros(1).Eye(u.Shape()[1], 0).ToSlice2(), 2*m*epsilon); err != nil {
+			if err := equal2(gemm(u.H(), u), Zeros(1).Eye(u.Shape()[1], 0).ToSlice2(), 2*m*epsilon); err != nil {
 				t.Fatalf("%+v", err)
 			}
-			if err := equal2(Gemm(v.H(), v), Zeros(1).Eye(v.Shape()[1], 0).ToSlice2(), 2*m*epsilon); err != nil {
+			if err := equal2(gemm(v.H(), v), Zeros(1).Eye(v.Shape()[1], 0).ToSlice2(), 2*m*epsilon); err != nil {
 				t.Fatalf("%+v", err)
 			}
 
@@ -1049,13 +1049,13 @@ func TestSVD(t *testing.T) {
 				// Change to ground truth basis.
 				trun := [][2]int{{0, minD}, {0, minD}}
 				if u.Shape()[0] < v.Shape()[0] {
-					phase := Gemm(v.H(), T2(testv))
-					u.Set([]int{0, 0}, Gemm(u, phase.Slice(trun)))
-					v.Set([]int{0, 0}, Gemm(v, phase))
+					phase := gemm(v.H(), T2(testv))
+					u.Set([]int{0, 0}, gemm(u, phase.Slice(trun)))
+					v.Set([]int{0, 0}, gemm(v, phase))
 				} else {
-					phase := Gemm(u.H(), T2(testu))
-					u.Set([]int{0, 0}, Gemm(u, phase))
-					v.Set([]int{0, 0}, Gemm(v, phase.Slice(trun)))
+					phase := gemm(u.H(), T2(testu))
+					u.Set([]int{0, 0}, gemm(u, phase))
+					v.Set([]int{0, 0}, gemm(v, phase.Slice(trun)))
 				}
 				// Check u and v in ground truth basis.
 				for j, vecsPair := range [][2]*Dense{{u, T2(testu)}, {v, T2(testv)}} {
@@ -1256,18 +1256,18 @@ func TestBidiagonalize(t *testing.T) {
 			bidiagonalize(u, v, b, bufs)
 
 			// Check u @ b @ v.H == a.
-			ubvh := Gemm(u, b, v.H())
+			ubvh := gemm(u, b, v.H())
 			delta := epsilon * test.a.FrobeniusNorm()
 			if err := equal2(ubvh, test.a.ToSlice2(), delta); err != nil {
 				t.Fatalf("%+v", err)
 			}
 
 			// Check u and v are unitary.
-			uu := Gemm(u, u.H())
+			uu := gemm(u, u.H())
 			if err := equal2(uu, Zeros(1).Eye(test.a.Shape()[0], 0).ToSlice2(), 2*epsilon); err != nil {
 				t.Fatalf("%+v", err)
 			}
-			vv := Gemm(v, v.H())
+			vv := gemm(v, v.H())
 			if err := equal2(vv, Zeros(1).Eye(test.a.Shape()[1], 0).ToSlice2(), 2*epsilon); err != nil {
 				t.Fatalf("%+v", err)
 			}

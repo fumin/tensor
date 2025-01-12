@@ -5,7 +5,7 @@ import (
 	"gonum.org/v1/gonum/blas/cblas128"
 )
 
-func T128(t *Dense) cblas128.General {
+func to128(t *Dense) cblas128.General {
 	g := cblas128.General{Rows: t.Shape()[0], Cols: t.Shape()[1]}
 	g.Stride = g.Cols
 	g.Data = make([]complex128, 0, g.Rows*g.Cols)
@@ -17,11 +17,11 @@ func T128(t *Dense) cblas128.General {
 	return g
 }
 
-func Gemm(ts ...*Dense) *Dense {
-	t128 := T128(ts[0])
+func gemm(ts ...*Dense) *Dense {
+	t128 := to128(ts[0])
 	for i := 1; i < len(ts); i++ {
-		t1 := T128(Zeros(t128.Rows, ts[i].Shape()[1]))
-		cblas128.Gemm(blas.NoTrans, blas.NoTrans, 1, t128, T128(ts[i]), 0, t1)
+		t1 := to128(Zeros(t128.Rows, ts[i].Shape()[1]))
+		cblas128.Gemm(blas.NoTrans, blas.NoTrans, 1, t128, to128(ts[i]), 0, t1)
 		t128 = t1
 	}
 

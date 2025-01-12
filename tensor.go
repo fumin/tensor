@@ -13,15 +13,6 @@ const (
 	maxDimension = 16
 )
 
-type Tensor interface {
-	Shape() []int
-	SetAt([]int, complex64)
-	At(...int) complex64
-
-	Digits() []int
-	Data() []complex64
-}
-
 type axis struct {
 	// size is the axis length in the underlying data buffer.
 	size int
@@ -175,14 +166,6 @@ func (t *Dense) At(digits ...int) complex64 {
 	}
 
 	return c
-}
-
-func (t *Dense) Digits() []int {
-	return t.digits[:t.dimension]
-}
-
-func (t *Dense) Data() []complex64 {
-	return t.data
 }
 
 func (a *Dense) Equal(b *Dense, tol float32) error {
@@ -412,8 +395,8 @@ func (a *Dense) Add(c complex64, b *Dense) *Dense {
 	return a
 }
 
-func Contract(c *Dense, a, b Tensor, axes [][2]int) *Dense {
-	if len(Overlap(c.Data(), a.Data())) > 0 || len(Overlap(c.Data(), b.Data())) > 0 {
+func Contract(c, a, b *Dense, axes [][2]int) *Dense {
+	if len(Overlap(c.data, a.data)) > 0 || len(Overlap(c.data, b.data)) > 0 {
 		panic("same array")
 	}
 	// Check shapes match.
@@ -462,34 +445,37 @@ func Contract(c *Dense, a, b Tensor, axes [][2]int) *Dense {
 		c.data = append(c.data, 0)
 	}
 
+	aDigits := a.digits[:a.dimension]
+	bDigits := b.digits[:b.dimension]
+	cDigits := c.digits[:c.dimension]
+
 	// Do the contraction.
 	cntrct := make([]int, len(axShapes))
 	var ptr int = -1
 	c.initDigits()
 	for c.incrDigits() {
 		ptr++
-		cDigits := c.digits[:c.dimension]
 
 		var v complex64
 		initDigits(cntrct)
 		for incrDigits(cntrct, axShapes) {
 			// Get A component.
 			for _, d := range cToA {
-				a.Digits()[d[1]] = cDigits[d[0]]
+				aDigits[d[1]] = cDigits[d[0]]
 			}
 			for i, ctt := range cntrct {
-				a.Digits()[axes[i][0]] = ctt
+				aDigits[axes[i][0]] = ctt
 			}
-			av := a.At(a.Digits()...)
+			av := a.At(aDigits...)
 
 			// Get B component.
 			for _, d := range cToB {
-				b.Digits()[d[1]] = cDigits[d[0]]
+				bDigits[d[1]] = cDigits[d[0]]
 			}
 			for i, ctt := range cntrct {
-				b.Digits()[axes[i][1]] = ctt
+				bDigits[axes[i][1]] = ctt
 			}
-			bv := b.At(b.Digits()...)
+			bv := b.At(bDigits...)
 
 			v += av * bv
 		}
@@ -499,11 +485,9 @@ func Contract(c *Dense, a, b Tensor, axes [][2]int) *Dense {
 	return c
 }
 
-func MatMul(c *Dense, a, b Tensor) *Dense {
-	ad, adok := a.(*Dense)
-	bd, bdok := b.(*Dense)
-	if adok && bdok && len(a.Shape()) == 2 && len(b.Shape()) == 2 {
-		return matmul(c, ad, bd)
+func MatMul(c, a, b *Dense) *Dense {
+	if len(a.Shape()) == 2 && len(b.Shape()) == 2 {
+		return matmul(c, a, b)
 	}
 	if len(b.Shape()) == 1 {
 		return Contract(c, a, b, [][2]int{{len(a.Shape()) - 1, len(b.Shape()) - 1}})

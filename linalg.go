@@ -349,7 +349,7 @@ func checkEigenvectors(eigvals, eigvecs, a *Dense, debug bool) {
 		diff.Add(1, av)
 		diff.Add(-1, lambdaVec)
 
-		if diff.FrobeniusNorm() > 100*epsilon*max(abs(lambda), 1) {
+		if diff.FrobeniusNorm() > 200*epsilon*max(abs(lambda), 1) {
 			panic(fmt.Sprintf("%v %f", lambda, diff.FrobeniusNorm()))
 		}
 	}

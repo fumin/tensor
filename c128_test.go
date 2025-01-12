@@ -23,7 +23,7 @@ func TestGemm(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
-			p := Gemm(test.ts...)
+			p := gemm(test.ts...)
 			if err := equal2(p, test.p, epsilon); err != nil {
 				t.Fatalf("%+v", err)
 			}

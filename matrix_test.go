@@ -390,14 +390,14 @@ func TestSVD22(t *testing.T) {
 			}
 
 			eye := Zeros(1).Eye(2, 0).ToSlice2()
-			if err := equal2(Gemm(u, u.H()), eye, epsilon); err != nil {
+			if err := equal2(gemm(u, u.H()), eye, epsilon); err != nil {
 				t.Fatalf("%+v", err)
 			}
-			if err := equal2(Gemm(v, v.H()), eye, epsilon); err != nil {
+			if err := equal2(gemm(v, v.H()), eye, epsilon); err != nil {
 				t.Fatalf("%+v", err)
 			}
 
-			usv := Gemm(u, s, v.H())
+			usv := gemm(u, s, v.H())
 			if err := equal2(usv, test.a.ToSlice2(), epsilon); err != nil {
 				t.Fatalf("%+v", err)
 			}

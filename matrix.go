@@ -33,43 +33,7 @@ func (a *Dense) InfNorm() float32 {
 	return norm
 }
 
-func (t *Dense) ToDiag() *Diagonal {
-	diag := &Diagonal{diag: t}
-	diag.shape[0], diag.shape[1] = t.Shape()[0], t.Shape()[0]
-	return diag
-}
-
-type Diagonal struct {
-	diag *Dense
-
-	shape  [2]int
-	digits [2]int
-}
-
-func (t *Diagonal) Shape() []int {
-	return t.shape[:]
-}
-
-func (t *Diagonal) SetAt(digits []int, c complex64) {
-	panic("not supported")
-}
-
-func (t *Diagonal) At(digits ...int) complex64 {
-	if digits[0] != digits[1] {
-		return 0
-	}
-	return t.diag.At(digits[0])
-}
-
-func (t *Diagonal) Digits() []int {
-	return t.digits[:]
-}
-
-func (t *Diagonal) Data() []complex64 {
-	return t.diag.Data()
-}
-
-func eig22(t Tensor) (complex64, complex64) {
+func eig22(t *Dense) (complex64, complex64) {
 	a, b := complex128(t.At(0, 0)), complex128(t.At(0, 1))
 	c, d := complex128(t.At(1, 0)), complex128(t.At(1, 1))
 	iSqrt := cmplx.Sqrt(a*a - 2*a*d + 4*b*c + d*d)
@@ -174,9 +138,9 @@ func svd22(s, u, v *Dense) {
 }
 
 func (t *Dense) Triu(k int) *Dense {
+	d := t.digits[:t.dimension]
 	t.initDigits()
 	for t.incrDigits() {
-		d := t.Digits()
 		i, j := d[len(d)-2], d[len(d)-1]
 		if j < i+k {
 			t.SetAt(d, 0)
@@ -186,9 +150,9 @@ func (t *Dense) Triu(k int) *Dense {
 }
 
 func (t *Dense) Tril(k int) *Dense {
+	d := t.digits[:t.dimension]
 	t.initDigits()
 	for t.incrDigits() {
-		d := t.Digits()
 		i, j := d[len(d)-2], d[len(d)-1]
 		if j > i+k {
 			t.SetAt(d, 0)
