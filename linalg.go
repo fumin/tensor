@@ -21,6 +21,7 @@ const (
 	safmin = 0x1p-126
 )
 
+// ArnoldiOptions are options for performing Arnoldi iteration.
 type ArnoldiOptions struct {
 	krylovSpaceDim int
 	maxIterations  int
@@ -28,6 +29,7 @@ type ArnoldiOptions struct {
 	debug bool
 }
 
+// NewArnoldiOptions returns the default Arnoldi iteration options.
 func NewArnoldiOptions() ArnoldiOptions {
 	opt := ArnoldiOptions{}
 	opt.krylovSpaceDim = -1
@@ -35,17 +37,20 @@ func NewArnoldiOptions() ArnoldiOptions {
 	return opt
 }
 
+// KrylovSpaceDim sets the specified Krylov space dimension.
 func (opt ArnoldiOptions) KrylovSpaceDim(v int) ArnoldiOptions {
 	opt.krylovSpaceDim = v
 	return opt
 }
 
+// MaxIterations sets the maximum iterations.
 func (opt ArnoldiOptions) MaxIterations(v int) ArnoldiOptions {
 	opt.maxIterations = v
 	return opt
 }
 
-func Arnoldi(eigvals, eigvecs, a *Dense, k int, bufs []*Dense, options ...ArnoldiOptions) error {
+// Arnoldi performs the Arnoldi iteration for finding the k eigenvalues with the smallest real part.
+func Arnoldi(eigvals, eigvecs, a *Dense, k int, buffers [7]*Dense, options ...ArnoldiOptions) error {
 	opt := NewArnoldiOptions()
 	if len(options) > 0 {
 		opt = options[0]
@@ -57,10 +62,10 @@ func Arnoldi(eigvals, eigvecs, a *Dense, k int, bufs []*Dense, options ...Arnold
 	opt.krylovSpaceDim = min(m, opt.krylovSpaceDim)
 
 	// Prepare buffers for Q, H, R in the Arnoldi relation A@Q = Q@H + R.
-	bQ := bufs[0]
-	bH := bufs[1]
-	bR := bufs[2]
-	bufs = bufs[3:]
+	bQ := buffers[0]
+	bH := buffers[1]
+	bR := buffers[2]
+	bufs := buffers[3:]
 
 	bH.Reset(opt.krylovSpaceDim+1, opt.krylovSpaceDim)
 
@@ -78,7 +83,8 @@ func Arnoldi(eigvals, eigvecs, a *Dense, k int, bufs []*Dense, options ...Arnold
 			return errors.Wrap(err, "")
 		}
 		hcopy := bufs[0].Reset(h.Shape()...).Set([]int{0, 0}, h)
-		if err := Eig(eigvals, eigvecs, hcopy, bufs[1:]); err != nil {
+		ebufs := [3]*Dense(bufs[1:])
+		if err := Eig(eigvals, eigvecs, hcopy, ebufs); err != nil {
 			return errors.Wrap(err, "")
 		}
 		hvecs = eigvecs.Slice([][2]int{{0, eigvecs.Shape()[0]}, {0, k}})
@@ -355,7 +361,11 @@ func checkEigenvectors(eigvals, eigvecs, a *Dense, debug bool) {
 	}
 }
 
-func Eig(eigvals, eigvecs, a *Dense, bufs []*Dense) error {
+// Eig finds the eigenvalues of matrix a, which are stored in eigvals.
+// eigvals are sorted from small to large of their real parts.
+// If eigvecs is not nil, it is set to the corresponding eigenvectors.
+// Matrix a is modified upon return.
+func Eig(eigvals, eigvecs, a *Dense, bufs [3]*Dense) error {
 	if err := eig(eigvals, eigvecs, a, bufs); err != nil {
 		return errors.Wrap(err, "")
 	}
@@ -363,7 +373,7 @@ func Eig(eigvals, eigvecs, a *Dense, bufs []*Dense) error {
 	return nil
 }
 
-func eig(eigvals, eigvecs, a *Dense, bufs []*Dense) error {
+func eig(eigvals, eigvecs, a *Dense, bufs [3]*Dense) error {
 	m := a.Shape()[0]
 
 	// d is the balancing matrix.
@@ -467,7 +477,7 @@ func InverseIteration(q, a *Dense, mu complex64, bufs []*Dense) (complex64, erro
 		t.SetAt([]int{i, i}, t.At(i, i)-mu)
 	}
 	u := bufs[1]
-	qrBufs := []*Dense{bufs[2], bufs[3]}
+	qrBufs := [2]*Dense{bufs[2], bufs[3]}
 	t = QR(u, t, qrBufs)
 	// Find the zero index so that back-substitution does not return a zero vector.
 	zeroIndex := -1
@@ -680,11 +690,16 @@ func backSubstitution(x, l, b *Dense, zeroIndex int) {
 	}
 }
 
+// QROptions are options for the QR decomposition.
 type QROptions struct {
+	// Full specifies whether to return the full orthogonal basis.
 	Full bool
 }
 
-func QR(q, a *Dense, bufs []*Dense, options ...QROptions) *Dense {
+// QR performs the QR decomposition of matrix a.
+// QR returns the Upper Triangular matrix R, and q is set to the orthogonal matrix Q.
+// Matrix a is modified upon return.
+func QR(q, a *Dense, bufs [2]*Dense, options ...QROptions) *Dense {
 	m, n := a.Shape()[0], a.Shape()[1]
 	if m >= n {
 		return qrTall(q, a, bufs, options...)
@@ -692,7 +707,7 @@ func QR(q, a *Dense, bufs []*Dense, options ...QROptions) *Dense {
 	return qrShort(q, a, bufs)
 }
 
-func qrShort(q, a *Dense, bufs []*Dense) *Dense {
+func qrShort(q, a *Dense, bufs [2]*Dense) *Dense {
 	// Split a into {aLeft, aRight}, where aLeft is square.
 	m, n := a.Shape()[0], a.Shape()[1]
 	aLeft := a.Slice([][2]int{{0, m}, {0, m}})
@@ -705,7 +720,7 @@ func qrShort(q, a *Dense, bufs []*Dense) *Dense {
 	return a
 }
 
-func qrTall(q, a *Dense, bufs []*Dense, options ...QROptions) *Dense {
+func qrTall(q, a *Dense, bufs [2]*Dense, options ...QROptions) *Dense {
 	opt := QROptions{}
 	if len(options) > 0 {
 		opt = options[0]
@@ -775,11 +790,16 @@ func qrTall(q, a *Dense, bufs []*Dense, options ...QROptions) *Dense {
 	return a
 }
 
+// SVDOptions are options for the Singular Value Decomposition.
 type SVDOptions struct {
+	// Full specifies whether to return the full orthogonal basis.
 	Full bool
 }
 
-func SVD(u, v, s *Dense, bufs []*Dense, options ...SVDOptions) (*Dense, error) {
+// SVD performs the Singular Value Decomposition.
+// SVD returns the diagonal matrix S holding the singular values, and u, v are set to the orthogonal matrices U and V.
+// Matrix s is modified upon return.
+func SVD(u, v, s *Dense, bufs [3]*Dense, options ...SVDOptions) (*Dense, error) {
 	opt := SVDOptions{}
 	if len(options) > 0 {
 		opt = options[0]
@@ -806,32 +826,34 @@ func SVD(u, v, s *Dense, bufs []*Dense, options ...SVDOptions) (*Dense, error) {
 
 // rsvd performs SVD with R-bidiagonalization.
 // See Figure 8.6.1, Matrix Computations 4th Ed., G. H. Golub, C. F. Van Loan.
-func rsvd(u, v, s *Dense, bufs []*Dense, opt SVDOptions) error {
+func rsvd(u, v, s *Dense, bufs [3]*Dense, opt SVDOptions) error {
 	m, n := s.Shape()[0], s.Shape()[1]
+	bufs2 := [2]*Dense(bufs[:2])
 	if m < 3*n/2 {
-		return svd(u, v, s, bufs)
+		return svd(u, v, s, bufs2)
 	}
 
-	r := QR(u, s, bufs, QROptions{Full: opt.Full})
+	// s is sufficiently tall, so do R-SVD which trades the cost of a QR for a small square matrix r.
+	r := QR(u, s, bufs2, QROptions{Full: opt.Full})
 	r = r.Slice([][2]int{{0, n}, {0, n}})
 
 	ur := bufs[0]
-	bufs = bufs[1:]
-	if err := svd(ur, v, r, bufs); err != nil {
+	bufs2 = [2]*Dense(bufs[1:])
+	if err := svd(ur, v, r, bufs2); err != nil {
 		return errors.Wrap(err, "")
 	}
 
 	un := u.Slice([][2]int{{0, m}, {0, n}})
-	un.Set([]int{0, 0}, MatMul(bufs[0], un, ur))
+	un.Set([]int{0, 0}, MatMul(bufs2[0], un, ur))
 
 	return nil
 }
 
-func svd(u, v, s *Dense, bufs []*Dense) error {
+func svd(u, v, s *Dense, bufs [2]*Dense) error {
 	tol := max(10, min(100, float32(math.Pow(epsilon, -1./8)))) * epsilon
 
 	m, n := s.Shape()[0], s.Shape()[1]
-	bidiagonalize(u, v, s, bufs)
+	bidiagonalize(u, v, s, bufs[:])
 	b := s.Slice([][2]int{{0, n}, {0, n}})
 
 	smin, _ := calcSMinMax(b)

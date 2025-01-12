@@ -37,6 +37,7 @@ func Overlap(x, y []complex64) (z []complex64) {
 	return
 }
 
+// ReadMatrixMarket reads a matrix in Matrix Market format.
 func ReadMatrixMarket(r io.Reader) (*Dense, error) {
 	const general = "general"
 	const symmetric = "symmetric"

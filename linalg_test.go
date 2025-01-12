@@ -101,9 +101,9 @@ func TestArnoldi(t *testing.T) {
 			}
 			opt.debug = true
 
-			bufs := make([]*Dense, 0)
-			for _ = range 7 {
-				bufs = append(bufs, Zeros(1))
+			var bufs [7]*Dense
+			for i := range len(bufs) {
+				bufs[i] = Zeros(1)
 			}
 			eigvals, eigvecs := Zeros(1), Zeros(1)
 			var err error
@@ -236,9 +236,9 @@ func TestEig(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
-			bufs := make([]*Dense, 0)
-			for _ = range 3 {
-				bufs = append(bufs, Zeros(1))
+			var bufs [3]*Dense
+			for i := range len(bufs) {
+				bufs[i] = Zeros(1)
 			}
 			a := Zeros(test.a.Shape()...).Set([]int{0, 0}, test.a)
 			eigvals, eigvecs := Zeros(1), Zeros(1)
@@ -305,12 +305,13 @@ func TestInverseIteration(t *testing.T) {
 				t.Skip()
 			}
 			a := Zeros(test.a.Shape()...).Set([]int{0, 0}, test.a)
-			bufs := make([]*Dense, 0)
-			for _ = range 4 {
-				bufs = append(bufs, Zeros(1))
+			var bufs [4]*Dense
+			for i := range len(bufs) {
+				bufs[i] = Zeros(1)
 			}
+			ebufs := [3]*Dense(bufs[:3])
 			eigvals := Zeros(1)
-			if err := Eig(eigvals, nil, test.a, bufs); err != nil {
+			if err := Eig(eigvals, nil, test.a, ebufs); err != nil {
 				t.Fatalf("%+v", err)
 			}
 			sortConj(eigvals, nil, test.lambda)
@@ -705,7 +706,7 @@ func TestQRTall(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
 			a := Zeros(test.a.Shape()...).Set([]int{0, 0}, test.a)
-			q, bufs := Zeros(1), []*Dense{Zeros(1), Zeros(1)}
+			q, bufs := Zeros(1), [2]*Dense{Zeros(1), Zeros(1)}
 			r := QR(q, test.a, bufs, QROptions{Full: test.full})
 
 			// Check shape of r.
@@ -783,7 +784,7 @@ func TestQRFat(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
 			a := Zeros(test.a.Shape()...).Set([]int{0, 0}, test.a)
-			q, bufs := Zeros(1), []*Dense{Zeros(1), Zeros(1)}
+			q, bufs := Zeros(1), [2]*Dense{Zeros(1), Zeros(1)}
 			r := QR(q, test.a, bufs)
 
 			// Check shape of r.
@@ -995,9 +996,9 @@ func TestSVD(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
-			bufs := make([]*Dense, 0)
-			for _ = range 3 {
-				bufs = append(bufs, Zeros(1))
+			var bufs [3]*Dense
+			for i := range len(bufs) {
+				bufs[i] = Zeros(1)
 			}
 			a := Zeros(test.a.Shape()...).Set([]int{0, 0}, test.a)
 			u, v := Zeros(1), Zeros(1)

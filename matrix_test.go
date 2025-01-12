@@ -14,6 +14,7 @@ func TestEye(t *testing.T) {
 	}{
 		{n: 4, k: 0, b: T2([][]complex64{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}})},
 		{n: 4, k: 2, b: T2([][]complex64{{0, 0, 1, 0}, {0, 0, 0, 1}, {0, 0, 0, 0}, {0, 0, 0, 0}})},
+		{n: 4, k: -2, b: T2([][]complex64{{0, 0, 0, 0}, {0, 0, 0, 0}, {1, 0, 0, 0}, {0, 1, 0, 0}})},
 	}
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {

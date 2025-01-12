@@ -1,4 +1,4 @@
-module tensor
+module github.com/fumin/tensor
 
 go 1.23.2
 

@@ -7,6 +7,7 @@ import (
 	"math/cmplx"
 )
 
+// Eye creates an identity matrix with ones at the k-th diagonal.
 func (t *Dense) Eye(n, k int) *Dense {
 	t.Reset(n, n)
 	for i := range n {
@@ -21,6 +22,7 @@ func (t *Dense) Eye(n, k int) *Dense {
 	return t
 }
 
+// InfNorm returns the infinity norm of matrix a.
 func (a *Dense) InfNorm() float32 {
 	var norm float32 = -1
 	for i := 0; i < a.Shape()[0]; i++ {
@@ -137,6 +139,7 @@ func svd22(s, u, v *Dense) {
 	v.SetAt([]int{1, 1}, conj(v.At(1, 1)))
 }
 
+// Triu zeros elements below the k-th diagonal.
 func (t *Dense) Triu(k int) *Dense {
 	d := t.digits[:t.dimension]
 	t.initDigits()
@@ -149,6 +152,7 @@ func (t *Dense) Triu(k int) *Dense {
 	return t
 }
 
+// Tril zeros elements above the k-th diagonal.
 func (t *Dense) Tril(k int) *Dense {
 	d := t.digits[:t.dimension]
 	t.initDigits()

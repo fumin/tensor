@@ -1,3 +1,12 @@
+// Package tensor implements multi-dimensional tensors on complex numbers.
+// Tensors support [contraction] as well as the usual slicing, transposing, and reshaping operations.
+// In addition, this package provides functions to:
+//   - Find the top k eigenpairs of a large matrix
+//   - Find all eigenpairs of a matrix
+//   - Perform the Singular Value Decomposition
+//   - Perform the QR Decomposition
+//
+// [contraction]: https://en.wikipedia.org/wiki/Tensor_contraction
 package tensor
 
 import (
@@ -21,6 +30,7 @@ type axis struct {
 	end   int
 }
 
+// A Dense is a complex multi-dimensional tensor.
 type Dense struct {
 	dimension int
 
@@ -40,30 +50,38 @@ type Dense struct {
 	shape  [maxDimension]int
 }
 
+// Zeros returns a zero tensor with the specified shape.
 func Zeros(shape ...int) *Dense {
 	return (&Dense{}).Reset(shape...)
 }
 
+// T1 creates a tensor from a 1-D slice.
 func T1(slice []complex64) *Dense {
 	return (&Dense{}).T1(slice)
 }
 
+// T2 creates a tensor from a 2-D slice.
 func T2(slice [][]complex64) *Dense {
 	return (&Dense{}).T2(slice)
 }
 
+// T3 creates a tensor from a 3-D slice.
 func T3(slice [][][]complex64) *Dense {
 	return (&Dense{}).T3(slice)
 }
 
+// T4 creates a tensor from a 4-D slice.
 func T4(slice [][][][]complex64) *Dense {
 	return (&Dense{}).T4(slice)
 }
 
+// Scalar creates a scalar tensor.
 func Scalar(c complex64) *Dense {
 	return &Dense{data: []complex64{c}}
 }
 
+// Reset resets t to a zero tensor of specified shape.
+// While the backing slice is the same, t is reset to be neither sliced nor transposed.
 func (t *Dense) Reset(shape ...int) *Dense {
 	// Configure axes.
 	t.dimension = len(shape)
@@ -88,6 +106,7 @@ func (t *Dense) Reset(shape ...int) *Dense {
 	return t
 }
 
+// T1 resets t to a 1-D slice.
 func (t *Dense) T1(slice []complex64) *Dense {
 	t.Reset(len(slice))
 
@@ -100,6 +119,7 @@ func (t *Dense) T1(slice []complex64) *Dense {
 	return t
 }
 
+// T2 resets t to a 2-D slice.
 func (t *Dense) T2(slice [][]complex64) *Dense {
 	t.Reset(len(slice), len(slice[0]))
 
@@ -112,6 +132,7 @@ func (t *Dense) T2(slice [][]complex64) *Dense {
 	return t
 }
 
+// T3 resets t to a 3-D slice.
 func (t *Dense) T3(slice [][][]complex64) *Dense {
 	t.Reset(len(slice), len(slice[0]), len(slice[0][0]))
 
@@ -124,6 +145,7 @@ func (t *Dense) T3(slice [][][]complex64) *Dense {
 	return t
 }
 
+// T4 resets t to a 4-D slice.
 func (t *Dense) T4(slice [][][][]complex64) *Dense {
 	t.Reset(len(slice), len(slice[0]), len(slice[0][0]), len(slice[0][0][0]))
 
@@ -136,10 +158,12 @@ func (t *Dense) T4(slice [][][][]complex64) *Dense {
 	return t
 }
 
+// Shape returns the shape of t.
 func (t *Dense) Shape() []int {
 	return t.shape[:t.dimension]
 }
 
+// SetAt sets the value of t at position digits to c.
 func (t *Dense) SetAt(digits []int, c complex64) {
 	if t.conj {
 		c = conj(c)
@@ -152,6 +176,7 @@ func (t *Dense) SetAt(digits []int, c complex64) {
 	}
 }
 
+// At returns the value of t at position digits.
 func (t *Dense) At(digits ...int) complex64 {
 	var c complex64
 	switch t.dimension {
@@ -168,6 +193,7 @@ func (t *Dense) At(digits ...int) complex64 {
 	return c
 }
 
+// Equal returns whether a and b are equal within tolerance.
 func (a *Dense) Equal(b *Dense, tol float32) error {
 	if len(a.Shape()) != len(b.Shape()) {
 		return errors.Errorf("different shapes %d %d", len(a.Shape()), len(b.Shape()))
@@ -190,6 +216,7 @@ func (a *Dense) Equal(b *Dense, tol float32) error {
 	return nil
 }
 
+// All returns an iterator over values in t.
 func (t *Dense) All() func(yield func([]int, complex64) bool) {
 	digits := t.digits[:t.dimension]
 	return func(yield func([]int, complex64) bool) {
@@ -203,6 +230,7 @@ func (t *Dense) All() func(yield func([]int, complex64) bool) {
 	}
 }
 
+// Set performs t[start0:end0, start1:end1, ...] = a, where end = start + a.shape.
 func (t *Dense) Set(start []int, a *Dense) *Dense {
 	if len(start) != t.dimension || a.dimension != t.dimension {
 		panic(fmt.Sprintf("wrong dimension %d %d %d", t.dimension, len(start), a.dimension))
@@ -231,6 +259,7 @@ func (t *Dense) Set(start []int, a *Dense) *Dense {
 	return t
 }
 
+// Slice returns a[b00:b01, b10:b11, b20:b21, ...].
 func (a *Dense) Slice(boundary [][2]int) *Dense {
 	for i := range a.dimension {
 		if !(boundary[i][0] >= 0 && boundary[i][0] <= a.shape[i]) {
@@ -267,6 +296,7 @@ func (a *Dense) Slice(boundary [][2]int) *Dense {
 	return b
 }
 
+// Transpose returns a tensor with axes transposed.
 func (a *Dense) Transpose(axis ...int) *Dense {
 	// Check if axis is {0, 1, 2,...}
 	if len(axis) != a.dimension {
@@ -292,6 +322,7 @@ func (a *Dense) Transpose(axis ...int) *Dense {
 	return b
 }
 
+// Reshape reshapes a tensor to the specified shape.
 func (a *Dense) Reshape(shape ...int) *Dense {
 	// Transposed tensor cannot be reshaped.
 	for i := range a.dimension {
@@ -353,6 +384,7 @@ func (a *Dense) Reshape(shape ...int) *Dense {
 	return b
 }
 
+// Conj returns the complex conjugate of a tensor.
 func (a *Dense) Conj() *Dense {
 	b := &Dense{dimension: a.dimension, axis: a.axis, viewToAxis: a.viewToAxis, data: a.data}
 	b.updateShape()
@@ -360,6 +392,7 @@ func (a *Dense) Conj() *Dense {
 	return b
 }
 
+// Mul multiplies x with c.
 func (x *Dense) Mul(c complex64) *Dense {
 	digits := x.digits[:x.dimension]
 	x.initDigits()
@@ -375,6 +408,7 @@ func (x *Dense) Mul(c complex64) *Dense {
 	return x
 }
 
+// Add performs a = a + c*b.
 func (a *Dense) Add(c complex64, b *Dense) *Dense {
 	if !slices.Equal(a.Shape(), b.Shape()) {
 		panic(fmt.Sprintf("wrong shape %#v %#v", a.Shape(), b.Shape()))
@@ -395,6 +429,7 @@ func (a *Dense) Add(c complex64, b *Dense) *Dense {
 	return a
 }
 
+// Contract returns the tensor contraction of a and b over the specified axes, whose result is stored in c.
 func Contract(c, a, b *Dense, axes [][2]int) *Dense {
 	if len(Overlap(c.data, a.data)) > 0 || len(Overlap(c.data, b.data)) > 0 {
 		panic("same array")
@@ -485,6 +520,7 @@ func Contract(c, a, b *Dense, axes [][2]int) *Dense {
 	return c
 }
 
+// MatMul returns matrix multiplication of a and b, whose result is stored in c.
 func MatMul(c, a, b *Dense) *Dense {
 	if len(a.Shape()) == 2 && len(b.Shape()) == 2 {
 		return matmul(c, a, b)
@@ -495,6 +531,7 @@ func MatMul(c, a, b *Dense) *Dense {
 	return Contract(c, a, b, [][2]int{{len(a.Shape()) - 1, len(b.Shape()) - 2}})
 }
 
+// H returns the Hermitian adjoint of t.
 func (t *Dense) H() *Dense {
 	ax := make([]int, len(t.Shape()))
 	for i := range len(t.Shape()) {
@@ -504,6 +541,7 @@ func (t *Dense) H() *Dense {
 	return t.Transpose(ax...).Conj()
 }
 
+// FrobeniusNorm returns the FrobniusNorm of t.
 func (t *Dense) FrobeniusNorm() float32 {
 	var scale float32
 	var sumSquares float32 = 1
@@ -527,6 +565,7 @@ func (t *Dense) FrobeniusNorm() float32 {
 	return scale * sqrtf(sumSquares)
 }
 
+// ToSlice1 returns t as a 1-D slice.
 func (t *Dense) ToSlice1() []complex64 {
 	if len(t.Shape()) != 1 {
 		panic(fmt.Sprintf("%#v", t.Shape()))
@@ -538,6 +577,7 @@ func (t *Dense) ToSlice1() []complex64 {
 	return slice
 }
 
+// ToSlice2 returns t as a 2-D slice.
 func (t *Dense) ToSlice2() [][]complex64 {
 	if len(t.Shape()) != 2 {
 		panic(fmt.Sprintf("%#v", t.Shape()))
