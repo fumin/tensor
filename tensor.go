@@ -232,12 +232,20 @@ func (t *Dense) All() func(yield func([]int, complex64) bool) {
 
 // Set performs t[start0:end0, start1:end1, ...] = a, where end = start + a.shape.
 func (t *Dense) Set(start []int, a *Dense) *Dense {
-	if len(start) != t.dimension || a.dimension != t.dimension {
-		panic(fmt.Sprintf("wrong dimension %d %d %d", t.dimension, len(start), a.dimension))
+	if a.dimension != t.dimension {
+		panic(fmt.Sprintf("wrong dimension between tensors %d != %d", a.dimension, t.dimension))
+	}
+	if len(start) > 0 && len(start) != t.dimension {
+		panic(fmt.Sprintf("wrong dimension between start vector and tensor %d != %d", len(start), a.dimension))
 	}
 	for i := range t.dimension {
-		if start[i]+a.shape[i] > t.shape[i] {
-			panic(fmt.Sprintf("%d %d + %d > %d", i, start[i], a.shape[i], t.shape[i]))
+		end := 0
+		if len(start) > 0 {
+			end += start[i]
+		}
+		end += a.shape[i]
+		if end > t.shape[i] {
+			panic(fmt.Sprintf("out of bounds at axis %d: %d + %d > %d", i, start[i], a.shape[i], t.shape[i]))
 		}
 	}
 
@@ -248,7 +256,11 @@ func (t *Dense) Set(start []int, a *Dense) *Dense {
 		av := a.At(aDigits...)
 
 		for i := range tDigits {
-			tDigits[i] = start[i] + aDigits[i]
+			tDigits[i] = 0
+			if len(start) > 0 {
+				tDigits[i] += start[i]
+			}
+			tDigits[i] += aDigits[i]
 		}
 		cv := av
 		if t.conj {
@@ -327,7 +339,7 @@ func (a *Dense) Reshape(shape ...int) *Dense {
 	// Transposed tensor cannot be reshaped.
 	for i := range a.dimension {
 		if a.viewToAxis[i] != i {
-			panic(fmt.Sprintf("%d", i))
+			panic(fmt.Sprintf("tensor has been transposed at axis %d", i))
 		}
 	}
 	// Sliced tensor cannot be reshaped.
@@ -430,6 +442,9 @@ func (a *Dense) Add(c complex64, b *Dense) *Dense {
 }
 
 // Contract returns the tensor contraction of a and b over the specified axes, whose result is stored in c.
+// The [tensor product] is equivalent to Contract(c, a, b, nil).
+//
+// [tensor product]: https://en.wikipedia.org/wiki/Tensor_product
 func Contract(c, a, b *Dense, axes [][2]int) *Dense {
 	if len(Overlap(c.data, a.data)) > 0 || len(Overlap(c.data, b.data)) > 0 {
 		panic("same array")
@@ -492,27 +507,40 @@ func Contract(c, a, b *Dense, axes [][2]int) *Dense {
 		ptr++
 
 		var v complex64
-		initDigits(cntrct)
-		for incrDigits(cntrct, axShapes) {
-			// Get A component.
+		if len(cntrct) == 0 { // Case for tensor product.
 			for _, d := range cToA {
 				aDigits[d[1]] = cDigits[d[0]]
 			}
-			for i, ctt := range cntrct {
-				aDigits[axes[i][0]] = ctt
-			}
 			av := a.At(aDigits...)
-
-			// Get B component.
 			for _, d := range cToB {
 				bDigits[d[1]] = cDigits[d[0]]
-			}
-			for i, ctt := range cntrct {
-				bDigits[axes[i][1]] = ctt
 			}
 			bv := b.At(bDigits...)
 
 			v += av * bv
+		} else {
+			initDigits(cntrct)
+			for incrDigits(cntrct, axShapes) {
+				// Get A component.
+				for _, d := range cToA {
+					aDigits[d[1]] = cDigits[d[0]]
+				}
+				for i, ctt := range cntrct {
+					aDigits[axes[i][0]] = ctt
+				}
+				av := a.At(aDigits...)
+
+				// Get B component.
+				for _, d := range cToB {
+					bDigits[d[1]] = cDigits[d[0]]
+				}
+				for i, ctt := range cntrct {
+					bDigits[axes[i][1]] = ctt
+				}
+				bv := b.At(bDigits...)
+
+				v += av * bv
+			}
 		}
 
 		c.data[ptr] = v
