@@ -21,45 +21,30 @@ const (
 	safmin = 0x1p-126
 )
 
-// ArnoldiOptions are options for performing Arnoldi iteration.
+// ArnoldiOptions are options for the Arnoldi iteration.
 type ArnoldiOptions struct {
-	krylovSpaceDim int
-	maxIterations  int
+	// KrylovSpaceDim is the dimension of the Krylov subspace.
+	KrylovSpaceDim int
+	// MaxIterations is the maximum number of Arnoldi iterations performed.
+	MaxIterations int
 
 	debug bool
 }
 
-// NewArnoldiOptions returns the default Arnoldi iteration options.
-func NewArnoldiOptions() ArnoldiOptions {
-	opt := ArnoldiOptions{}
-	opt.krylovSpaceDim = -1
-	opt.maxIterations = 64
-	return opt
-}
-
-// KrylovSpaceDim sets the specified Krylov space dimension.
-func (opt ArnoldiOptions) KrylovSpaceDim(v int) ArnoldiOptions {
-	opt.krylovSpaceDim = v
-	return opt
-}
-
-// MaxIterations sets the maximum iterations.
-func (opt ArnoldiOptions) MaxIterations(v int) ArnoldiOptions {
-	opt.maxIterations = v
-	return opt
-}
-
 // Arnoldi performs the Arnoldi iteration for finding the k eigenvalues with the smallest real part.
 func Arnoldi(eigvals, eigvecs, a *Dense, k int, buffers [7]*Dense, options ...ArnoldiOptions) error {
-	opt := NewArnoldiOptions()
+	var opt ArnoldiOptions
 	if len(options) > 0 {
 		opt = options[0]
 	}
-	if opt.krylovSpaceDim < 0 {
-		opt.krylovSpaceDim = max(2*k+1, 20)
+	if opt.MaxIterations == 0 {
+		opt.MaxIterations = 64
+	}
+	if opt.KrylovSpaceDim == 0 {
+		opt.KrylovSpaceDim = max(2*k+1, 20)
 	}
 	m := a.Shape()[0]
-	opt.krylovSpaceDim = min(m, opt.krylovSpaceDim)
+	opt.KrylovSpaceDim = min(m, opt.KrylovSpaceDim)
 
 	// Prepare buffers for Q, H, R in the Arnoldi relation A@Q = Q@H + R.
 	bQ := buffers[0]
@@ -67,17 +52,17 @@ func Arnoldi(eigvals, eigvecs, a *Dense, k int, buffers [7]*Dense, options ...Ar
 	bR := buffers[2]
 	bufs := buffers[3:]
 
-	bH.Reset(opt.krylovSpaceDim+1, opt.krylovSpaceDim)
+	bH.Reset(opt.KrylovSpaceDim+1, opt.KrylovSpaceDim)
 
 	// Start with a random vector for the first Arnoldi iteration.
-	bQ.Reset(m, opt.krylovSpaceDim)
+	bQ.Reset(m, opt.KrylovSpaceDim)
 	bQ.Set([]int{0, 0}, randVec(bufs[0].Reset(m, 1)))
 	start := 1
 
 	// hvecs are eigenvectors in the Krylov space.
 	var hvecs *Dense
 	var cvg arnoldiConvergence
-	for _ = range opt.maxIterations {
+	for _ = range opt.MaxIterations {
 		q, h, r, err := arnoldiIterate(a, bQ, bH, bR, start, bufs, opt.debug)
 		if err != nil {
 			return errors.Wrap(err, "")
@@ -96,7 +81,7 @@ func Arnoldi(eigvals, eigvecs, a *Dense, k int, buffers [7]*Dense, options ...Ar
 		// Prevent stagnation by increasing the wanted set.
 		// For more details, see Section 5.1.2 XYaup2, ARPACK Users' Guide, Lehoucq et al.
 		start = k + cvg.numConverged
-		start = min(start, k+(opt.krylovSpaceDim-k)/2)
+		start = min(start, k+(opt.KrylovSpaceDim-k)/2)
 
 		unwanted := eigvals.Slice([][2]int{{start, eigvals.Shape()[0]}})
 		implicitlyRestart(unwanted, a, q, h, r, bufs, opt.debug)
@@ -111,7 +96,7 @@ func Arnoldi(eigvals, eigvecs, a *Dense, k int, buffers [7]*Dense, options ...Ar
 	eigvals.Set([]int{0}, bufs[0])
 	// Set eigvecs.
 	bufs[0].Reset(hvecs.Shape()...).Set([]int{0, 0}, hvecs)
-	q := bQ.Slice([][2]int{{0, m}, {0, opt.krylovSpaceDim}})
+	q := bQ.Slice([][2]int{{0, m}, {0, opt.KrylovSpaceDim}})
 	MatMul(eigvecs, q, bufs[0])
 
 	checkEigenvectors(eigvals, eigvecs, a, opt.debug)
@@ -959,22 +944,6 @@ func svd(u, v, s *Dense, bufs [2]*Dense) error {
 	}
 
 	return nil
-}
-
-func checkAllReal(prefix string, a *Dense) {
-	n := a.Shape()[1]
-	if imag(a.At(0, 0)) != 0 {
-		panic(fmt.Sprintf("%s 0 0 %v", prefix, a.At(0, 0)))
-	}
-	for j := 1; j < n; j++ {
-		if imag(a.At(j, j)) != 0 {
-			panic(fmt.Sprintf("%s %d %d %v", prefix, j, j, a.At(j, j)))
-		}
-		if imag(a.At(j, j-1)) != 0 {
-			panic(fmt.Sprintf("%s %d %d %v", prefix, j, j-1, a.At(j, j-1)))
-		}
-	}
-	log.Printf("%s all real", prefix)
 }
 
 func calcSMinMax(a *Dense) (float32, float32) {

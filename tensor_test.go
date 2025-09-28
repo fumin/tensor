@@ -559,7 +559,7 @@ func TestAddSlice(t *testing.T) {
 	}
 }
 
-func TestContract(t *testing.T) {
+func TestProduct(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		a    *Dense
@@ -636,9 +636,65 @@ func TestContract(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
 			c := Zeros(1)
-			Contract(c, test.a, test.b, test.axes)
+			Product(c, test.a, test.b, test.axes)
 			if err := c.Equal(test.c, 0); err != nil {
 				t.Fatalf("%#v %#v", c, test.c)
+			}
+		})
+	}
+}
+
+func TestContract(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		a    *Dense
+		axes [][2]int
+		b    *Dense
+	}{
+		{
+			a: T4([][][][]complex64{{
+				{{5, 6}, {7, 8}},
+				{{10, 12}, {14, 16}},
+			}, {
+				{{15, 18}, {21, 24}},
+				{{20, 24}, {28, 32}},
+			}}),
+			axes: [][2]int{{0, 1}},
+			b:    T2([][]complex64{{25, 30}, {35, 40}}),
+		},
+		{
+			a: T4([][][][]complex64{{
+				{{-999, -999}, {-999, -999}},
+				{{5, 6}, {7, 8}},
+				{{-15i, -18i}, {-21i, -24i}},
+			}, {
+				{{-999, -999}, {-999, -999}},
+				{{10, 12}, {14, 16}},
+				{{1 - 20i, -24i}, {-28i, -32i}},
+			}}).Conj().Transpose(1, 0, 2, 3).Slice([][2]int{{1, 3}, {0, 2}, {0, 2}, {0, 2}}),
+			axes: [][2]int{{2, 3}},
+			b:    T2([][]complex64{{13, 26}, {39i, 1 + 52i}}),
+		},
+		{
+			a:    trange(0, 1<<(2*5), 1).Reshape(2, 2, 2, 2, 2, 2, 2, 2, 2, 2),
+			axes: [][2]int{{0, 7}, {1, 4}, {5, 9}},
+			b: T4([][][][]complex64{{
+				{{3284, 3300}, {3348, 3364}},
+				{{3796, 3812}, {3860, 3876}},
+			}, {
+				{{4308, 4324}, {4372, 4388}},
+				{{4820, 4836}, {4884, 4900}},
+			},
+			}),
+		},
+	}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			t.Parallel()
+			b := Zeros(1)
+			Contract(b, test.a, test.axes)
+			if err := b.Equal(test.b, 0); err != nil {
+				t.Fatalf("%+v %#v %#v", err, b, test.b)
 			}
 		})
 	}

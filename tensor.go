@@ -1,11 +1,12 @@
 // Package tensor implements multi-dimensional tensors on complex numbers.
-// Tensors support [contraction] as well as the usual slicing, transposing, and reshaping operations.
+// Tensors support the [product], [contraction] as well as the usual slicing, transposing, and reshaping operations.
 // In addition, this package provides functions to:
 //   - Find the top k eigenpairs of a large matrix
 //   - Find all eigenpairs of a matrix
 //   - Perform the Singular Value Decomposition
 //   - Perform the QR Decomposition
 //
+// [product]: https://en.wikipedia.org/wiki/Tensor_product
 // [contraction]: https://en.wikipedia.org/wiki/Tensor_contraction
 package tensor
 
@@ -441,11 +442,11 @@ func (a *Dense) Add(c complex64, b *Dense) *Dense {
 	return a
 }
 
-// Contract returns the tensor contraction of a and b over the specified axes, whose result is stored in c.
-// The [tensor product] is equivalent to Contract(c, a, b, nil).
+// Product returns the tensor [product] of a and b followed by a subsequent tensor contraction along the specified axes.
+// The result is stored in c.
 //
-// [tensor product]: https://en.wikipedia.org/wiki/Tensor_product
-func Contract(c, a, b *Dense, axes [][2]int) *Dense {
+// [product]: https://en.wikipedia.org/wiki/Tensor_product
+func Product(c, a, b *Dense, axes [][2]int) *Dense {
 	if len(Overlap(c.data, a.data)) > 0 || len(Overlap(c.data, b.data)) > 0 {
 		panic("same array")
 	}
@@ -548,19 +549,97 @@ func Contract(c, a, b *Dense, axes [][2]int) *Dense {
 	return c
 }
 
+// Contract returns the tensor [contraction] of a along the specified axes, whose result is stored in b.
+//
+// [contraction]: https://en.wikipedia.org/wiki/Tensor_contraction
+func Contract(b, a *Dense, axes [][2]int) *Dense {
+	if len(Overlap(b.data, a.data)) > 0 {
+		panic("same array")
+	}
+	// Check shapes match.
+	axShapes := make([]int, 0, len(axes))
+	for _, axs := range axes {
+		if a.Shape()[axs[0]] != a.Shape()[axs[1]] {
+			panic(fmt.Sprintf("different axis dimensions %d %d axs %#v %#v", a.Shape()[axs[0]], a.Shape()[axs[1]], axs, a.Shape()))
+		}
+		axShapes = append(axShapes, a.Shape()[axs[0]])
+	}
+
+	// Find the dimensions of B.
+	bAxis := b.axis[:0]
+	var bLen int = 1
+	bToA := make([][2]int, 0, len(a.Shape()))
+	for i := range len(a.Shape()) {
+		if !slices.ContainsFunc(axes, func(axs [2]int) bool { return axs[0] == i || axs[1] == i }) {
+			bax := axis{size: a.Shape()[i]}
+			bax.start, bax.end = 0, bax.size
+			bAxis = append(bAxis, bax)
+
+			bLen *= bax.size
+			bToA = append(bToA, [2]int{len(bAxis) - 1, i})
+		}
+	}
+	b.dimension = len(bAxis)
+	for i := range b.dimension {
+		b.viewToAxis[i] = i
+	}
+	b.updateShape()
+
+	b.data = b.data[:0]
+	b.data = append(b.data, make([]complex64, bLen)...)
+	if b.dimension == 0 {
+		b.data = append(b.data, 0)
+	}
+
+	aDigits := a.digits[:a.dimension]
+	bDigits := b.digits[:b.dimension]
+
+	// Do the contraction.
+	cntrct := make([]int, len(axShapes))
+	var ptr int = -1
+	b.initDigits()
+	for b.incrDigits() {
+		ptr++
+
+		var v complex64
+		initDigits(cntrct)
+		for incrDigits(cntrct, axShapes) {
+			// Get component.
+			for _, d := range bToA {
+				aDigits[d[1]] = bDigits[d[0]]
+			}
+			for i, ctt := range cntrct {
+				aDigits[axes[i][0]] = ctt
+				aDigits[axes[i][1]] = ctt
+			}
+			av := a.At(aDigits...)
+
+			v += av
+		}
+
+		b.data[ptr] = v
+	}
+
+	return b
+}
+
 // MatMul returns matrix multiplication of a and b, whose result is stored in c.
 func MatMul(c, a, b *Dense) *Dense {
 	if len(a.Shape()) == 2 && len(b.Shape()) == 2 {
 		return matmul(c, a, b)
 	}
 	if len(b.Shape()) == 1 {
-		return Contract(c, a, b, [][2]int{{len(a.Shape()) - 1, len(b.Shape()) - 1}})
+		return Product(c, a, b, [][2]int{{len(a.Shape()) - 1, len(b.Shape()) - 1}})
 	}
-	return Contract(c, a, b, [][2]int{{len(a.Shape()) - 1, len(b.Shape()) - 2}})
+	return Product(c, a, b, [][2]int{{len(a.Shape()) - 1, len(b.Shape()) - 2}})
 }
 
 // H returns the Hermitian adjoint of t.
 func (t *Dense) H() *Dense {
+	if len(t.Shape()) < 2 {
+		return t.Conj()
+	}
+
 	ax := make([]int, len(t.Shape()))
 	for i := range len(t.Shape()) {
 		ax[i] = i
@@ -698,10 +777,6 @@ func sign(a, b float32) float32 {
 		return absf(a)
 	}
 	return -absf(a)
-}
-
-func sqrt(v complex64) complex64 {
-	return complex64(cmplx.Sqrt(complex128(v)))
 }
 
 func abs(v complex64) float32 {
