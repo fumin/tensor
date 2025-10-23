@@ -89,6 +89,103 @@ func ExampleProduct_kronecker() {
 	// Kronecker product (a * b * b * a * a): [(25+0i) (50+0i) (50+0i) (100+0i) (30+0i)]...
 }
 
+func ExampleDense_Set() {
+	a := tensor.T2([][]complex64{{0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}})
+	b := tensor.T2([][]complex64{{1, 2, 3}, {4, 5, 6}})
+
+	a.Set([]int{3, 2}, b)
+	fmt.Printf("a.Set({3, 2}, b):\n")
+	print(a)
+
+	a.Set([]int{0, -4}, b)
+	fmt.Printf("a.Set({0, -4}, b):\n")
+	print(a)
+
+	a.Set(nil, b)
+	fmt.Printf("a.Set(nil, b):\n")
+	print(a)
+
+	// Output:
+	// a.Set({3, 2}, b):
+	// (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i)
+	// (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i)
+	// (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i)
+	// (0+0i) (0+0i) (1+0i) (2+0i) (3+0i) (0+0i)
+	// (0+0i) (0+0i) (4+0i) (5+0i) (6+0i) (0+0i)
+	// (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i)
+	//
+	// a.Set({0, -4}, b):
+	// (0+0i) (0+0i) (1+0i) (2+0i) (3+0i) (0+0i)
+	// (0+0i) (0+0i) (4+0i) (5+0i) (6+0i) (0+0i)
+	// (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i)
+	// (0+0i) (0+0i) (1+0i) (2+0i) (3+0i) (0+0i)
+	// (0+0i) (0+0i) (4+0i) (5+0i) (6+0i) (0+0i)
+	// (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i)
+	//
+	// a.Set(nil, b):
+	// (1+0i) (2+0i) (3+0i) (2+0i) (3+0i) (0+0i)
+	// (4+0i) (5+0i) (6+0i) (5+0i) (6+0i) (0+0i)
+	// (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i)
+	// (0+0i) (0+0i) (1+0i) (2+0i) (3+0i) (0+0i)
+	// (0+0i) (0+0i) (4+0i) (5+0i) (6+0i) (0+0i)
+	// (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i)
+}
+
+func ExampleDense_Reshape() {
+	a := tensor.T1([]complex64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11})
+
+	fmt.Printf("a.Reshape(2, 6):\n")
+	print(a.Reshape(2, 6))
+
+	fmt.Printf("a.Reshape(3, -1):\n")
+	print(a.Reshape(3, -1))
+
+	// Output:
+	// a.Reshape(2, 6):
+	// (0+0i) (1+0i) (2+0i) (3+0i) (4+0i) (5+0i)
+	// (6+0i) (7+0i) (8+0i) (9+0i) (10+0i) (11+0i)
+	//
+	// a.Reshape(3, -1):
+	// (0+0i) (1+0i) (2+0i) (3+0i)
+	// (4+0i) (5+0i) (6+0i) (7+0i)
+	// (8+0i) (9+0i) (10+0i) (11+0i)
+	//
+}
+
+func ExampleDense_Slice() {
+	a := tensor.T2([][]complex64{{0, 1, 2, 3, 4, 5}, {6, 7, 8, 9, 10, 11}, {12, 13, 14, 15, 16, 17}})
+
+	b := a.Slice([][2]int{{1, 3}, {2, 5}})
+	fmt.Printf("a[1:3, 2:5] = %v\n", b.ToSlice2())
+
+	b = a.Slice([][2]int{{1, 3}, {2, -2}})
+	fmt.Printf("a[1:3, 2:-2] = %v\n", b.ToSlice2())
+
+	b = a.Slice([][2]int{{1, 0}, {2, -2}})
+	fmt.Printf("a[1:, 2:-2] = %v\n", b.ToSlice2())
+
+	b = a.Slice([][2]int{{}, {-4, -2}})
+	fmt.Printf("a[:, -4:-2] = %v\n", b.ToSlice2())
+
+	// Output:
+	// a[1:3, 2:5] = [[(8+0i) (9+0i) (10+0i)] [(14+0i) (15+0i) (16+0i)]]
+	// a[1:3, 2:-2] = [[(8+0i) (9+0i)] [(14+0i) (15+0i)]]
+	// a[1:, 2:-2] = [[(8+0i) (9+0i)] [(14+0i) (15+0i)]]
+	// a[:, -4:-2] = [[(2+0i) (3+0i)] [(8+0i) (9+0i)] [(14+0i) (15+0i)]]
+}
+
+func print(t *tensor.Dense) {
+	m := t.Shape()[0]
+	n := t.Shape()[1]
+	for i := range m {
+		for j := range n - 1 {
+			fmt.Printf("%v ", t.At(i, j))
+		}
+		fmt.Printf("%v\n", t.At(i, n-1))
+	}
+	fmt.Printf("\n")
+}
+
 func abs(x complex64) float64 {
 	return cmplx.Abs(complex128(x))
 }

@@ -232,6 +232,8 @@ func (t *Dense) All() func(yield func([]int, complex64) bool) {
 }
 
 // Set performs t[start0:end0, start1:end1, ...] = a, where end = start + a.shape.
+// If start[i] < 0, start[i] = t.Shape()[i] + start[i].
+// If start is nil, start is set to the origin {0, 0, 0, ...}.
 func (t *Dense) Set(start []int, a *Dense) *Dense {
 	if a.dimension != t.dimension {
 		panic(fmt.Sprintf("wrong dimension between tensors %d != %d", a.dimension, t.dimension))
@@ -239,10 +241,19 @@ func (t *Dense) Set(start []int, a *Dense) *Dense {
 	if len(start) > 0 && len(start) != t.dimension {
 		panic(fmt.Sprintf("wrong dimension between start vector and tensor %d != %d", len(start), a.dimension))
 	}
+
+	st := func(i int) int {
+		s := start[i]
+		if s < 0 {
+			return t.Shape()[i] + s
+		}
+		return s
+	}
+
 	for i := range t.dimension {
 		end := 0
 		if len(start) > 0 {
-			end += start[i]
+			end += st(i)
 		}
 		end += a.shape[i]
 		if end > t.shape[i] {
@@ -259,7 +270,7 @@ func (t *Dense) Set(start []int, a *Dense) *Dense {
 		for i := range tDigits {
 			tDigits[i] = 0
 			if len(start) > 0 {
-				tDigits[i] += start[i]
+				tDigits[i] += st(i)
 			}
 			tDigits[i] += aDigits[i]
 		}
@@ -273,12 +284,25 @@ func (t *Dense) Set(start []int, a *Dense) *Dense {
 }
 
 // Slice returns a[b00:b01, b10:b11, b20:b21, ...].
+// If bij < 0, it is inferred to be (a.Shape()[i] + bij).
+// If bi1 == 0, it is inferred to be a.Shape()[i].
 func (a *Dense) Slice(boundary [][2]int) *Dense {
+	bd := func(i, j int) int {
+		b := boundary[i][j]
+		if b < 0 {
+			return a.Shape()[i] + b
+		}
+		if j == 1 && b == 0 {
+			return a.Shape()[i]
+		}
+		return b
+	}
+
 	for i := range a.dimension {
-		if !(boundary[i][0] >= 0 && boundary[i][0] <= a.shape[i]) {
+		if !(bd(i, 0) >= 0 && bd(i, 0) <= a.shape[i]) {
 			panic(fmt.Sprintf("At dim %d boundary %d shape %d", i, boundary[i][0], a.shape[i]))
 		}
-		if !(boundary[i][1] >= boundary[i][0] && boundary[i][1] <= a.shape[i]) {
+		if !(bd(i, 1) >= bd(i, 0) && bd(i, 1) <= a.shape[i]) {
 			panic(fmt.Sprintf("At dim %d boundary %d %d shape %d", i, boundary[i][0], boundary[i][1], a.shape[i]))
 		}
 	}
@@ -291,8 +315,8 @@ func (a *Dense) Slice(boundary [][2]int) *Dense {
 	b := &Dense{dimension: a.dimension, viewToAxis: a.viewToAxis, axis: a.axis, conj: a.conj, data: a.data}
 	for i := range b.dimension {
 		ax := b.axis[b.viewToAxis[i]]
-		b.axis[b.viewToAxis[i]].start = ax.start + boundary[i][0]
-		b.axis[b.viewToAxis[i]].end = ax.start + boundary[i][1]
+		b.axis[b.viewToAxis[i]].start = ax.start + bd(i, 0)
+		b.axis[b.viewToAxis[i]].end = ax.start + bd(i, 1)
 
 		// We can normalize for the outer most axis.
 		if b.viewToAxis[i] == 0 {
@@ -336,6 +360,7 @@ func (a *Dense) Transpose(axis ...int) *Dense {
 }
 
 // Reshape reshapes a tensor to the specified shape.
+// If one of the dimensions in shape is -1, it is automatically inferred.
 func (a *Dense) Reshape(shape ...int) *Dense {
 	// Transposed tensor cannot be reshaped.
 	for i := range a.dimension {

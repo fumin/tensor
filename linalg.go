@@ -206,6 +206,9 @@ func implicitlyRestart(shifts, a, qM, h, r *Dense, bufs []*Dense, debug bool) {
 
 		p, q := m, -1
 		for {
+			if p == 0 {
+				break
+			}
 			remainder := h.Slice([][2]int{{0, p}, {0, p}})
 			skipped := m - p
 			p, q = findUnreducedHessenberg(remainder)
