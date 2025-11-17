@@ -3,7 +3,9 @@ package tensor_test
 import (
 	"fmt"
 	"log"
+	"math"
 	"math/cmplx"
+	"strconv"
 
 	"github.com/fumin/tensor"
 )
@@ -95,60 +97,60 @@ func ExampleDense_Set() {
 
 	a.Set([]int{3, 2}, b)
 	fmt.Printf("a.Set({3, 2}, b):\n")
-	print(a)
+	printInt(a)
 
 	a.Set([]int{0, -4}, b)
 	fmt.Printf("a.Set({0, -4}, b):\n")
-	print(a)
+	printInt(a)
 
 	a.Set(nil, b)
 	fmt.Printf("a.Set(nil, b):\n")
-	print(a)
+	printInt(a)
 
 	// Output:
 	// a.Set({3, 2}, b):
-	// (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i)
-	// (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i)
-	// (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i)
-	// (0+0i) (0+0i) (1+0i) (2+0i) (3+0i) (0+0i)
-	// (0+0i) (0+0i) (4+0i) (5+0i) (6+0i) (0+0i)
-	// (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i)
+	// 0 0 0 0 0 0
+	// 0 0 0 0 0 0
+	// 0 0 0 0 0 0
+	// 0 0 1 2 3 0
+	// 0 0 4 5 6 0
+	// 0 0 0 0 0 0
 	//
 	// a.Set({0, -4}, b):
-	// (0+0i) (0+0i) (1+0i) (2+0i) (3+0i) (0+0i)
-	// (0+0i) (0+0i) (4+0i) (5+0i) (6+0i) (0+0i)
-	// (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i)
-	// (0+0i) (0+0i) (1+0i) (2+0i) (3+0i) (0+0i)
-	// (0+0i) (0+0i) (4+0i) (5+0i) (6+0i) (0+0i)
-	// (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i)
+	// 0 0 1 2 3 0
+	// 0 0 4 5 6 0
+	// 0 0 0 0 0 0
+	// 0 0 1 2 3 0
+	// 0 0 4 5 6 0
+	// 0 0 0 0 0 0
 	//
 	// a.Set(nil, b):
-	// (1+0i) (2+0i) (3+0i) (2+0i) (3+0i) (0+0i)
-	// (4+0i) (5+0i) (6+0i) (5+0i) (6+0i) (0+0i)
-	// (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i)
-	// (0+0i) (0+0i) (1+0i) (2+0i) (3+0i) (0+0i)
-	// (0+0i) (0+0i) (4+0i) (5+0i) (6+0i) (0+0i)
-	// (0+0i) (0+0i) (0+0i) (0+0i) (0+0i) (0+0i)
+	// 1 2 3 2 3 0
+	// 4 5 6 5 6 0
+	// 0 0 0 0 0 0
+	// 0 0 1 2 3 0
+	// 0 0 4 5 6 0
+	// 0 0 0 0 0 0
 }
 
 func ExampleDense_Reshape() {
 	a := tensor.T1([]complex64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11})
 
 	fmt.Printf("a.Reshape(2, 6):\n")
-	print(a.Reshape(2, 6))
+	printInt(a.Reshape(2, 6))
 
 	fmt.Printf("a.Reshape(3, -1):\n")
-	print(a.Reshape(3, -1))
+	printInt(a.Reshape(3, -1))
 
 	// Output:
 	// a.Reshape(2, 6):
-	// (0+0i) (1+0i) (2+0i) (3+0i) (4+0i) (5+0i)
-	// (6+0i) (7+0i) (8+0i) (9+0i) (10+0i) (11+0i)
+	// 0 1 2 3 4 5
+	// 6 7 8 9 10 11
 	//
 	// a.Reshape(3, -1):
-	// (0+0i) (1+0i) (2+0i) (3+0i)
-	// (4+0i) (5+0i) (6+0i) (7+0i)
-	// (8+0i) (9+0i) (10+0i) (11+0i)
+	// 0 1 2 3
+	// 4 5 6 7
+	// 8 9 10 11
 	//
 }
 
@@ -174,16 +176,101 @@ func ExampleDense_Slice() {
 	// a[:, -4:-2] = [[(2+0i) (3+0i)] [(8+0i) (9+0i)] [(14+0i) (15+0i)]]
 }
 
-func print(t *tensor.Dense) {
-	m := t.Shape()[0]
-	n := t.Shape()[1]
-	for i := range m {
-		for j := range n - 1 {
-			fmt.Printf("%v ", t.At(i, j))
+func ExampleSVD() {
+	// This example shows how we can use the SVD to compute
+	// the kernel, image, and cokernel of a linear map.
+	a := tensor.T2([][]complex64{
+		{1, 2, 3, 2},
+		{1, 1, 2, 2},
+		{1, 3, 4, 2},
+	})
+
+	// Compute the SVD.
+	bufs := [3]*tensor.Dense{tensor.Zeros(1), tensor.Zeros(1), tensor.Zeros(1)}
+	u, v := tensor.Zeros(1), tensor.Zeros(1)
+	s, _ := tensor.SVD(u, v, a, bufs, tensor.SVDOptions{Full: true})
+
+	// Collect the kernel, image, and cokernel.
+	const tol = 1e-5
+	kernel := make([][]float32, 0)
+	image := make([][]float32, 0)
+	cokernel := make([][]float32, 0)
+	m, n := s.Shape()[0], s.Shape()[1]
+	for i := range u.Shape()[1] {
+		ui := u.Slice([][2]int{{}, {i, i + 1}})
+		if !(i < m && i < n) || real(s.At(i, i)) < tol {
+			cokernel = append(cokernel, realSlice(ui))
+		} else {
+			image = append(image, realSlice(ui))
 		}
-		fmt.Printf("%v\n", t.At(i, n-1))
+	}
+	for i := range v.Shape()[1] {
+		vi := v.Slice([][2]int{{}, {i, i + 1}})
+		if !(i < m && i < n) || real(s.At(i, i)) < tol {
+			kernel = append(kernel, realSlice(vi))
+		}
+	}
+
+	fmt.Println("kernel:")
+	printFloats(kernel, 3)
+	fmt.Println("image:")
+	printFloats(image, 3)
+	fmt.Println("cokernel:")
+	printFloats(cokernel, 3)
+
+	// Output:
+	// kernel:
+	// [0.902, 0.055, -0.055, -0.424]
+	// [0.061, 0.672, -0.672, 0.305]
+	//
+	// image:
+	// [0.562, 0.403, 0.722]
+	// [0.130, 0.819, -0.558]
+	//
+	// cokernel:
+	// [0.816, -0.408, -0.408]
+}
+
+func printInt(t *tensor.Dense) {
+	m := t.Shape()[0]
+	for i := range m {
+		row := intSlice(t.Slice([][2]int{{i, i + 1}, {}}))
+		for _, v := range row[:len(row)-1] {
+			fmt.Printf("%d ", v)
+		}
+		fmt.Printf("%d\n", row[len(row)-1])
 	}
 	fmt.Printf("\n")
+}
+
+func printFloats(xs [][]float32, prec int) {
+	for _, x := range xs {
+		fmt.Printf("[")
+		for i := range len(x) - 1 {
+			fmt.Printf("%s, ", strconv.FormatFloat(float64(x[i]), 'f', prec, 32))
+		}
+		fmt.Printf("%s]\n", strconv.FormatFloat(float64(x[len(x)-1]), 'f', prec, 32))
+	}
+	fmt.Printf("\n")
+}
+
+func intSlice(x *tensor.Dense) []int {
+	y := realSlice(x)
+	z := make([]int, len(y))
+	for i := range y {
+		z[i] = int(math.Round(float64(y[i])))
+	}
+	return z
+}
+
+func realSlice(x *tensor.Dense) []float32 {
+	flat := tensor.Zeros(x.Shape()...).Set(nil, x)
+	flat = flat.Reshape(-1)
+	y := make([]float32, flat.Shape()[0])
+	for i := range flat.Shape()[0] {
+		y[i] = real(flat.At(i))
+	}
+	return y
 }
 
 func abs(x complex64) float64 {

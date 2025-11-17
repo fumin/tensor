@@ -165,6 +165,47 @@ func (t *Dense) Tril(k int) *Dense {
 	return t
 }
 
+// Exp computes the matrix exponential of a.
+func Exp(a *Dense, buf [4]*Dense) *Dense {
+	j := max(0, 1+int(math.Floor(math.Log2(float64(a.InfNorm())))))
+	j2 := 1 << j
+	a.Mul(complex(1./float32(j2), 0))
+	const q = 6
+	d := buf[0].Eye(a.Shape()[0], 0)
+	n := buf[1].Eye(a.Shape()[0], 0)
+	x := buf[2].Eye(a.Shape()[0], 0)
+	var c complex64 = 1
+	for ki := 1; ki <= q; ki++ {
+		k := complex(float32(ki), 0)
+		c = c * (q - k + 1) / ((2*q - k + 1) * k)
+		x.Set(nil, MatMul(buf[3], a, x))
+		n.Add(c, x)
+		if ki%2 == 1 {
+			d.Add(-c, x)
+		} else {
+			d.Add(c, x)
+		}
+	}
+
+	// Solve for f in d @ f = n.
+	u := buf[2]
+	qrBufs := [2]*Dense{a, buf[3]}
+	d = QR(u, d, qrBufs)
+	n = MatMul(buf[3], u.H(), n)
+	f := a
+	for j := range f.Shape()[1] {
+		bnd := [][2]int{{}, {j, j + 1}}
+		fj := f.Slice(bnd)
+		nj := n.Slice(bnd)
+		backSubstitution(fj, d, nj, -1)
+	}
+
+	for range j {
+		f.Set(nil, MatMul(buf[0], f, f))
+	}
+	return f
+}
+
 func matmul(c, a, b *Dense) *Dense {
 	m, an, n := a.Shape()[0], a.Shape()[1], b.Shape()[1]
 	if an != b.Shape()[0] {

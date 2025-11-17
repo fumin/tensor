@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	maxDimension = 16
+	maxDimension = 32
 )
 
 type axis struct {
@@ -700,7 +700,7 @@ func (t *Dense) FrobeniusNorm() float32 {
 // ToSlice1 returns t as a 1-D slice.
 func (t *Dense) ToSlice1() []complex64 {
 	if len(t.Shape()) != 1 {
-		panic(fmt.Sprintf("%#v", t.Shape()))
+		panic(fmt.Sprintf("tensor with shape %v not 1 dimensional", t.Shape()))
 	}
 	slice := make([]complex64, t.shape[0])
 	for i := range len(slice) {
@@ -712,7 +712,7 @@ func (t *Dense) ToSlice1() []complex64 {
 // ToSlice2 returns t as a 2-D slice.
 func (t *Dense) ToSlice2() [][]complex64 {
 	if len(t.Shape()) != 2 {
-		panic(fmt.Sprintf("%#v", t.Shape()))
+		panic(fmt.Sprintf("tensor with shape %v not 2 dimensional", t.Shape()))
 	}
 	slice := make([][]complex64, t.shape[0])
 	for i := range len(slice) {
